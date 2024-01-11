@@ -1,222 +1,214 @@
-# Función para cargar/guardar datos desde un archivo CSV:
+# Función para cargar/guardar datos desde un archivo xlsx:
 cargar_datos <- function() {
   # Instalamos las librerias dplyr, readxl para la manipulación de datos .xlsx y la lectura de los mismos.
+  if (!requireNamespace("gridExtra", quietly = TRUE)) {
+    install.packages("gridExtra")
+  }
   if (!requireNamespace("ggplot2", quietly = TRUE)) {
     install.packages("ggplot2")
   }
-  library(ggplot2)
-  
   if (!requireNamespace("dplyr", quietly = TRUE)) {
     install.packages("dplyr")
   }
   if (!requireNamespace("readxl", quietly = TRUE)) {
     install.packages("readxl")
   }
+  library(gridExtra)
+  library(ggplot2)
   library(dplyr)
   library(readxl)
   # Colocamos el url o link del archivo local en la maquina donde
   # se halla el archivo .xlsx para la extracción de datos.
   url <- "C:/Users/emilv/OneDrive/Documents/R-Studio/Deber 1-Intervalos Grupal 2/Calificaciones.xlsx"
   calificaciones <- readxl::read_excel(url)
+  cat("Cargando Datos...\n")
   return (calificaciones)
-
 }
-calificaciones <- cargar_datos()
-
+#separamos las columnas con las que vamos a trabajar
 filtar_datos <-function(calificaciones) {
-  
-  # Tomamos todos los datos filtrados de "Medicina" para tener una evidencia en la aproximacion de medias, varianzas y proporciones
-  # como tambien saber la cantidad de N datos disponibles para hallar las respectivas muestras aleatorias y buscar sus I.Confianza
-
   nombre_carrera <- calificaciones$nombre_carrera
-  
   resultado_global<- calificaciones$resultado_global
-  
-  
+  #retorna las dos columnas que de nuestra poblacion
+  cat("Filtrando Dato a Utilizar...\n")
   return(data.frame(nombre_carrera,resultado_global))
 }
-
-data_filtrada <- filtar_datos(calificaciones)
-
 # Función para calcular media, varianza y proporción del archivo .xlsx:
-calcular_estadisticas <- function(data_filtrada) {
+calcular_parametros <- function(data_filtrada) {
+  #sacamos cantidad de instancias de la carrera de medicina
+  count_medicina <- data_filtrada%>% filter(nombre_carrera == "MEDICINA") %>% select()%>% count()
+  #sacamos cantidad de instancias totales de las carreras
+  count_carreras <-data_filtrada%>% select(nombre_carrera)%>% count()
+  
+  #calculamos parametros:
   media_poblacional <- mean(data_filtrada$resultado_global)
   varianza_poblacional <- var(data_filtrada$resultado_global)
-
-  count_medicina <- data_filtrada%>% filter(nombre_carrera == "MEDICINA") %>% select()%>% count()
-  count_carreras <-data_filtrada%>% select(nombre_carrera)%>% count()
-
-  #medicina_count <- as.integer(medicina_count)
   proporcion_medicina_poblacional <- as.double(count_medicina / count_carreras)
   
-  
-  cat("Calculando estadísticas del CSV...\n")
-  # Devolvemos una lista de los valores aproximados del .csv por "Medicina"
+  cat("Calculando parametros de la poblacion...\n")
+
   return(data.frame(media_poblacional, varianza_poblacional, proporcion_medicina_poblacional))
 }
-parametros <- calcular_estadisticas(data_filtrada)
-print(calcular_estadisticas(data_filtrada))
-
-
-
-muestrar <- function(valores){
+#fucion para crear 100 muestras de 500
+muestrar <- function(valores,n){
   lista_muestras <- list()
-  
   # Generar 100 muestras de 500 datos cada una
-  for (i in 1:100) {
+  for (i in 1:n) {
     muestra <- sample(valores, 500, replace = FALSE)
     lista_muestras[[i]] <- muestra
   }
   return(lista_muestras)
 }
-muestras_resultado_global<-muestrar(data_filtrada$resultado_global)
-muestras_proporcion<-muestrar(data_filtrada$nombre_carrera)
-
-
-
-
-
-
-
-calcular_intervalos_media <- function(muestras_media, confianza = 0.95) {
+# Calcular intervalos de confianza para la media
+calcular_intervalos_media <- function(muestras_media, confianza) {
+  #instanciamos la lista que acumula nuestros intervalos...
   lista_intervalo <- list()
-  
+  #comenzamos el bucle que vaya por cada muestra
   for (i in seq_along(muestras_media)) {
+    #calculamos con la formula el error y media muestral
     media_muestra <- mean(muestras_media[[i]])
     desviacion_estandar_muestra <- sd(muestras_media[[i]])
     error_estandar <- qt((1 + confianza) / 2, df = length(muestras_media[[i]]) - 1) * desviacion_estandar_muestra / sqrt(length(muestras_media[[i]]))
-    
+    #hallamos el intervalo al diferenciar la media del error
     intervalo <- c(media_muestra - error_estandar, media_muestra + error_estandar)
+    #se registra el intervalo en la lista...
     lista_intervalo[[i]] <- intervalo
   }
   
   return(lista_intervalo)
 }
-# Calcular intervalos de confianza para la media
-intervalos_media <- calcular_intervalos_media(muestras_media, confianza = 0.95)
-print(intervalos_media)
-
-calcular_intervalos_varianza <- function(muestras_varianza, confianza = 0.95) {
+# Calcular intervalos de confianza para la varianza
+calcular_intervalos_varianza <- function(muestras_varianza, confianza ) {
+  #instanciamos la lista que acumula nuestros intervalos...
   lista_intervalo <- list()
   
+  #comenzamos el bucle que vaya por cada muestra
   for (i in seq_along(muestras_varianza)) {
     varianza_muestra <- var(muestras_varianza[[i]])
+    #calculamos los cuantiles de chi cuadrado
     chi_cuadrado_superior <- qchisq((1 + confianza) / 2, df = length(muestras_varianza[[i]]) - 1)
     chi_cuadrado_inferior <- qchisq((1 - confianza) / 2, df = length(muestras_varianza[[i]]) - 1)
     
+    #hallamos el intervalo calculando con las colas superior e inferior, respectivamente
     intervalo <- c((length(muestras_varianza[[i]]) - 1) * varianza_muestra / chi_cuadrado_superior,
                    (length(muestras_varianza[[i]]) - 1) * varianza_muestra / chi_cuadrado_inferior)
+    #acumulamos el intervalo
     lista_intervalo[[i]] <- intervalo
   }
   
   return(lista_intervalo)
 }
-# Calcular intervalos de confianza para la varianza
-intervalos_varianza <- calcular_intervalos_varianza(muestras_varianza, confianza = 0.95)
-
-print(intervalos_varianza)
-# Calcular intervalos de confianza para la varianza
-
-
-calcular_intervalos_proporcion <- function(muestras_proporcion, confianza = 0.95) {
+# Calcular intervalos de confianza para la proporcion
+calcular_intervalos_proporcion <- function(muestras_proporcion, confianza) {
+  #instanciamos la lista que acumula nuestros intervalos...
   lista_intervalo <- list()
-  
+  #comenzamos el bucle que vaya por cada muestra
   for (i in seq_along(muestras_proporcion)) {
+    #calculamos con la formula el error y proporcion muestral
     proporciones_muestra <- sum(muestras_proporcion[[i]] == "MEDICINA") / length(muestras_proporcion[[i]])
     z_score <- qnorm((1 + confianza) / 2)
     n <- length(muestras_proporcion[[i]])
-    
+  
+    #hallamos el intervalo al diferenciar la proporcion del error
     intervalo <- c((2 * n * proporciones_muestra + z_score^2 - 
                       z_score * sqrt(4 * n * proporciones_muestra * (1 - proporciones_muestra) + z_score^2)) / (2 * (n + z_score^2)),
                    (2 * n * proporciones_muestra + z_score^2 + 
                       z_score * sqrt(4 * n * proporciones_muestra * (1 - proporciones_muestra) + z_score^2)) / (2 * (n + z_score^2)))
+    #se registra el intervalo en la lista...
     lista_intervalo[[i]] <- intervalo
   }
   
   return(lista_intervalo)
 }
-
-# Calcular intervalos de confianza para la proporción
-intervalos_proporcion <- calcular_intervalos_proporcion(muestras_proporcion, confianza = 0.95)
-print(intervalos_proporcion)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-graficador <- function(secuencia_n, valores_min, valores_max, media_poblacional) {
-  
-# Crear un data.frame de ejemplo con 10 intervalos
-datos_intervalos <- data.frame(
-  n<- secuencia_n,
-  inicio<- valores_min,  # Ejemplo: intervalos generados aleatoriamente entre 40 y 60
-  fin <- valores_max, # Ejemplo: intervalos generados aleatoriamente entre 60 y 80
-  media <- media_poblacional
-)
-
-
-# Crear el gráfico de líneas para representar los intervalos
-ggplot(datos_intervalos) +
-  geom_segment(aes(x = inicio, y = n, xend = fin, yend = n), color = "blue", size = 1) +
-  geom_vline(xintercept = media, linetype = "dashed", color = "red", size = 1) +
-  labs(title = "Gráfico de Líneas que Representan 10 Intervalos", y = NULL, x = "Eje X") +
-  theme_minimal()
-
-}
-graficador(seq(1,100), sample(seq(1, 10), 100, replace = TRUE), sample(seq(11, 20), 100, replace = TRUE),10)
-
-
-
-
-
-
-library(ggplot2)
-
-graficador <- function(secuencia_n, intervalos, media_poblacional) {
+#funcion para graficar
+graficador <- function(secuencia_n, intervalos, media_poblacional, titulo) {
+  #juntamos todos los datos que entran a nuestra grafica 
   datos_intervalos <- data.frame(
-    n = secuencia_n,
-    inicio = sapply(intervalos, function(x) x[1]),
-    fin = sapply(intervalos, function(x) x[2]),
-    media = media_poblacional
+    n <- secuencia_n,
+    inicio <- sapply(intervalos, function(x) x[1]),
+    fin <- sapply(intervalos, function(x) x[2]),
+    media <- media_poblacional, 
+    titulo_grafica <- titulo 
   )
   
   ggplot(datos_intervalos) +
+    #aqui se determina los intervalos, osea ancho y su posicion en Y
     geom_segment(aes(x = inicio, y = n, xend = fin, yend = n), color = "blue", size = 1) +
+    #ubicamos el parametro a comparar
     geom_vline(xintercept = media_poblacional, linetype = "dashed", color = "red", size = 1) +
-    labs(title = "Gráfico de Líneas que Representan Intervalos", y = NULL, x = "Eje X") +
+    #añadimos titulos laterales
+    labs(title = titulo, y = "Numero de Muestras", x = "Intervalos") +
     theme_minimal()
 }
 
 
-graficador(seq(1, 100), intervalos_proporcion, parametros$proporcion_medicina_poblacional)
-graficador(seq(1, 100), intervalos_media, parametros$media_poblacional)
-graficador(seq(1, 100), intervalos_varianza, parametros$varianza_poblacional)
 
+
+
+
+
+
+menu <- function(){
+  n <- 100
+  cantidad_de_muestras <- seq(1, n)
+  
+  calificaciones <- cargar_datos()
+  data_filtrada <- filtar_datos(calificaciones)
+  
+  parametros <- calcular_parametros(data_filtrada)
+  print(calcular_parametros(data_filtrada))
+  
+  muestras_resultado_global<-muestrar(data_filtrada$resultado_global,n)
+  muestras_proporcion<-muestrar(data_filtrada$nombre_carrera,n)
+  
+  # Calcular intervalos de confianza para la media
+  intervalos_media_68 <- calcular_intervalos_media(muestras_media,  0.68)
+  intervalos_media_95 <- calcular_intervalos_media(muestras_media,  0.95)
+  intervalos_media_99.7 <- calcular_intervalos_media(muestras_media,  0.997)
+  
+  # Calcular intervalos de confianza para la varianza
+  intervalos_varianza_68 <- calcular_intervalos_varianza(muestras_varianza, 0.68)
+  intervalos_varianza_95 <- calcular_intervalos_varianza(muestras_varianza, 0.95)
+  intervalos_varianza_99.7 <- calcular_intervalos_varianza(muestras_varianza, 0.997)
+  
+  # Calcular intervalos de confianza para la proporción
+  intervalos_proporcion_68 <- calcular_intervalos_proporcion(muestras_proporcion,  0.68)
+  intervalos_proporcion_95 <- calcular_intervalos_proporcion(muestras_proporcion,  0.95)
+  intervalos_proporcion_99.7 <- calcular_intervalos_proporcion(muestras_proporcion,  0.997)
+  
+  grafica1 <- graficador(cantidad_de_muestras, intervalos_media_68, parametros$media_poblacional, "Grafico Intervalos de la Media con 68%")
+  grafica2 <- graficador(cantidad_de_muestras, intervalos_media_95, parametros$media_poblacional, "Grafico Intervalos de la Media con 95%")
+  grafica3 <- graficador(cantidad_de_muestras, intervalos_media_99.7, parametros$media_poblacional, "Grafico Intervalos de la Media con 99.7%")
+  grafica4 <- graficador(cantidad_de_muestras, intervalos_varianza_68, parametros$varianza_poblacional, "Grafico Intervalos de la Varianza con 68%")
+  grafica5 <- graficador(cantidad_de_muestras, intervalos_varianza_95, parametros$varianza_poblacional, "Grafico Intervalos de la Varianza con 95%")
+  grafica6 <- graficador(cantidad_de_muestras, intervalos_varianza_99.7, parametros$varianza_poblacional, "Grafico Intervalos de la Varianza con 99.7%")
+  grafica7 <- graficador(cantidad_de_muestras, intervalos_proporcion_68, parametros$proporcion_medicina_poblacional, "Grafico Intervalos de la Proporcion con 68%")
+  grafica8 <- graficador(cantidad_de_muestras, intervalos_proporcion_95, parametros$proporcion_medicina_poblacional, "Grafico Intervalos de la Proporcion con 95%")
+  grafica9 <- graficador(cantidad_de_muestras, intervalos_proporcion_99.7, parametros$proporcion_medicina_poblacional, "Grafico Intervalos de la Proporcion con 99.7%")
+  
+  
+  #  graficador(cantidad_de_muestras, intervalos_media_68, parametros$media_poblacional,"Grafico Intervalos de la Media con 68%")
+  #  graficador(cantidad_de_muestras, intervalos_media_95, parametros$media_poblacional,"Grafico Intervalos de la Media con 95%")
+  #  graficador(cantidad_de_muestras, intervalos_media_99.7, parametros$media_poblacional,"Grafico Intervalos de la Media con 99.7%")
+  #  graficador(cantidad_de_muestras, intervalos_varianza_68, parametros$varianza_poblacional,"Grafico Intervalos de la Varianza con 68%")
+  #  graficador(cantidad_de_muestras, intervalos_varianza_95, parametros$varianza_poblacional,"Grafico Intervalos de la Varianza con 95%")
+  #  graficador(cantidad_de_muestras, intervalos_varianza_99.7, parametros$varianza_poblacional,"Grafico Intervalos de la Varianza con 99.7%")
+  #  graficador(cantidad_de_muestras, intervalos_proporcion_68, parametros$proporcion_medicina_poblacional,"Grafico Intervalos de la Proporcion con 68%")
+  #  graficador(cantidad_de_muestras, intervalos_proporcion_95, parametros$proporcion_medicina_poblacional,"Grafico Intervalos de la Proporcion con 95%")
+  #  graficador(cantidad_de_muestras, intervalos_proporcion_99.7, parametros$proporcion_medicina_poblacional,"Grafico Intervalos de la Proporcion con 99.7%")
+  
+  # Lista de gráficas
+  graficas <- list(grafica1, grafica2, grafica3, grafica4, grafica5, grafica6, grafica7, grafica8, grafica9)
+  
+  # Iterar sobre cada gráfica y guardarla en un PDF separado
+  for (i in seq_along(graficas)) {
+    pdf(paste0("grafica_", i, ".pdf"), width = 14, height = 10)
+    print(graficas[[i]])
+    dev.off()
+    
+    print("fin")
+  }
+}
+
+
+menu()
 
