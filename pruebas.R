@@ -129,8 +129,7 @@ graficador <- function(secuencia_n, intervalos, media_poblacional, titulo) {
     media <- media_poblacional, 
     titulo_grafica <- titulo 
   )
-  
-  ggplot(datos_intervalos) +
+  plot_final <-  ggplot(datos_intervalos) +
     #aqui se determina los intervalos, osea ancho y su posicion en Y
     geom_segment(aes(x = inicio, y = n, xend = fin, yend = n), color = "blue", size = 1) +
     #ubicamos el parametro a comparar
@@ -138,6 +137,7 @@ graficador <- function(secuencia_n, intervalos, media_poblacional, titulo) {
     #añadimos titulos laterales
     labs(title = titulo, y = "Numero de Muestras", x = "Intervalos") +
     theme_minimal()
+  return(plot_final)
 }
 
 
@@ -147,7 +147,7 @@ graficador <- function(secuencia_n, intervalos, media_poblacional, titulo) {
 
 
 
-menu <- function(){
+
   n <- 100
   cantidad_de_muestras <- seq(1, n)
   
@@ -161,14 +161,14 @@ menu <- function(){
   muestras_proporcion<-muestrar(data_filtrada$nombre_carrera,n)
   
   # Calcular intervalos de confianza para la media
-  intervalos_media_68 <- calcular_intervalos_media(muestras_media,  0.68)
-  intervalos_media_95 <- calcular_intervalos_media(muestras_media,  0.95)
-  intervalos_media_99.7 <- calcular_intervalos_media(muestras_media,  0.997)
+  intervalos_media_68 <- calcular_intervalos_media(muestras_resultado_global,  0.68)
+  intervalos_media_95 <- calcular_intervalos_media(muestras_resultado_global,  0.95)
+  intervalos_media_99.7 <- calcular_intervalos_media(muestras_resultado_global,  0.997)
   
   # Calcular intervalos de confianza para la varianza
-  intervalos_varianza_68 <- calcular_intervalos_varianza(muestras_varianza, 0.68)
-  intervalos_varianza_95 <- calcular_intervalos_varianza(muestras_varianza, 0.95)
-  intervalos_varianza_99.7 <- calcular_intervalos_varianza(muestras_varianza, 0.997)
+  intervalos_varianza_68 <- calcular_intervalos_varianza(muestras_resultado_global, 0.68)
+  intervalos_varianza_95 <- calcular_intervalos_varianza(muestras_resultado_global, 0.95)
+  intervalos_varianza_99.7 <- calcular_intervalos_varianza(muestras_resultado_global, 0.997)
   
   # Calcular intervalos de confianza para la proporción
   intervalos_proporcion_68 <- calcular_intervalos_proporcion(muestras_proporcion,  0.68)
@@ -207,8 +207,7 @@ menu <- function(){
     
     print("fin")
   }
-}
 
 
-menu()
+
 
